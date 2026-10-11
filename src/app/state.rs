@@ -8,7 +8,7 @@ use ratatui::layout::Rect;
 
 use crate::app::models::{BrowseTab, SongOption};
 use crate::config::Config;
-use crate::subsonic::models::{Album, Artist, Child, InternetRadioStation, Playlist};
+use crate::subsonic::models::{Album, Artist, Child, InternetRadioStation, MusicFolder, Playlist};
 use crate::ui::theme::{ThemeColors, ThemeData};
 
 /// Current page in the application
@@ -503,6 +503,8 @@ pub struct AppState {
     pub cava_available: bool,
     /// Cached layout areas from last render (for mouse hit-testing)
     pub layout: LayoutAreas,
+    /// Music folders (libraries) available on the server
+    pub music_folders: Vec<MusicFolder>,
 }
 
 /// A row of styled segments from cava's terminal output
@@ -607,13 +609,134 @@ impl AppState {
     pub fn visible_pages(&self) -> Vec<Page> {
         Page::visible_from_config(&self.config.visible_tabs)
     }
+
+    /// Whether the server offers more than one library to switch between
+    pub fn has_multiple_music_folders(&self) -> bool {
+        self.music_folders.len() > 1
+    }
+
+    /// Store the server's music folders, falling back to all libraries when
+    /// the configured one no longer exists (e.g. after switching servers).
+    /// Returns `true` if the configured library was reset.
+    pub fn set_music_folders(&mut self, folders: Vec<MusicFolder>) -> bool {
+        self.music_folders = folders;
+        let stale = self
+            .config
+            .music_folder_id
+            .is_some_and(|id| !self.music_folders.iter().any(|f| f.id == id));
+        if stale {
+            self.config.music_folder_id = None;
+        }
+        stale
+    }
+
+    /// The library after the current one, cycling All -> each folder -> All
+    pub fn next_music_folder(&self) -> Option<i64> {
+        let current = self
+            .config
+            .music_folder_id
+            .and_then(|id| self.music_folders.iter().position(|f| f.id == id));
+        let next = current.map_or(0, |idx| idx + 1);
+        self.music_folders.get(next).map(|f| f.id)
+    }
+
+    /// Display name of the active library
+    pub fn music_folder_name(&self) -> String {
+        match self.config.music_folder_id {
+            None => "All".to_string(),
+            Some(id) => self
+                .music_folders
+                .iter()
+                .find(|f| f.id == id)
+                .map_or_else(|| format!("#{}", id), |f| f.name.clone()),
+        }
+    }
+
+    /// Pane title suffix naming the active library; empty unless the server
+    /// has more than one library to choose from.
+    pub fn library_title_suffix(&self) -> String {
+        if self.has_multiple_music_folders() {
+            format!("· Library: {} ", self.music_folder_name())
+        } else {
+            String::new()
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::config::Config;
+    use crate::subsonic::models::MusicFolder;
 
     use super::{AppState, Page};
+
+    fn folders() -> Vec<MusicFolder> {
+        vec![
+            MusicFolder {
+                id: 4,
+                name: "Music".to_string(),
+            },
+            MusicFolder {
+                id: 9,
+                name: "Audiobooks".to_string(),
+            },
+        ]
+    }
+
+    #[test]
+    fn music_folder_cycles_all_then_each_folder() {
+        let mut state = AppState::new(Config::default());
+        state.set_music_folders(folders());
+
+        let mut seen = Vec::new();
+        for _ in 0..4 {
+            state.config.music_folder_id = state.next_music_folder();
+            seen.push((state.config.music_folder_id, state.music_folder_name()));
+        }
+
+        assert_eq!(
+            seen,
+            vec![
+                (Some(4), "Music".to_string()),
+                (Some(9), "Audiobooks".to_string()),
+                (None, "All".to_string()),
+                (Some(4), "Music".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn stale_music_folder_falls_back_to_all() {
+        let mut state = AppState::new(Config {
+            music_folder_id: Some(42),
+            ..Default::default()
+        });
+
+        assert!(state.set_music_folders(folders()));
+        assert_eq!(state.config.music_folder_id, None);
+    }
+
+    #[test]
+    fn known_music_folder_is_kept() {
+        let mut state = AppState::new(Config {
+            music_folder_id: Some(9),
+            ..Default::default()
+        });
+
+        assert!(!state.set_music_folders(folders()));
+        assert_eq!(state.config.music_folder_id, Some(9));
+        assert_eq!(state.library_title_suffix(), "· Library: Audiobooks ");
+    }
+
+    #[test]
+    fn library_title_is_hidden_without_a_choice() {
+        let mut state = AppState::new(Config::default());
+        assert_eq!(state.library_title_suffix(), "");
+
+        state.set_music_folders(folders()[..1].to_vec());
+        assert!(!state.has_multiple_music_folders());
+        assert_eq!(state.library_title_suffix(), "");
+    }
 
     #[test]
     fn visible_pages_use_default_when_not_configured() {

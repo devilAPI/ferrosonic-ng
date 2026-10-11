@@ -55,6 +55,14 @@ pub struct Config {
     #[serde(rename = "SaveQueue", default = "Config::default_save_queue")]
     pub save_queue: bool,
 
+    /// Library (music folder) to browse; unset means all libraries
+    #[serde(
+        rename = "MusicFolderId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub music_folder_id: Option<i64>,
+
     /// Header tabs to show, in order. Empty uses the default tab list.
     #[serde(rename = "VisibleTabs", default, skip_serializing_if = "Vec::is_empty")]
     pub visible_tabs: Vec<String>,
@@ -196,6 +204,27 @@ VisibleTabs = ["Artists", "Queue", "Browse"]
         assert_eq!(config.username, "testuser");
         assert_eq!(config.password, "testpass");
         assert_eq!(config.visible_tabs, ["Artists", "Queue", "Browse"]);
+    }
+
+    #[test]
+    fn test_music_folder_id_round_trip() {
+        let file = NamedTempFile::new().unwrap();
+
+        let mut config = Config::new();
+        config.save_to_file(file.path()).unwrap();
+        let saved = std::fs::read_to_string(file.path()).unwrap();
+        assert!(!saved.contains("MusicFolderId"));
+        assert_eq!(
+            Config::load_from_file(file.path()).unwrap().music_folder_id,
+            None
+        );
+
+        config.music_folder_id = Some(3);
+        config.save_to_file(file.path()).unwrap();
+        assert_eq!(
+            Config::load_from_file(file.path()).unwrap().music_folder_id,
+            Some(3)
+        );
     }
 
     #[test]

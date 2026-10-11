@@ -93,7 +93,10 @@ impl App {
 
         let subsonic = if config.is_configured() {
             match SubsonicClient::new(&config.base_url, &config.username, &config.password) {
-                Ok(client) => Some(client),
+                Ok(mut client) => {
+                    client.set_music_folder(config.music_folder_id);
+                    Some(client)
+                }
                 Err(e) => {
                     warn!("Failed to create Subsonic client: {}", e);
                     None
@@ -242,6 +245,8 @@ impl App {
             state.browse.all_songs_has_more = true;
         }
 
+        // Folders first: they decide which library the calls below are scoped to
+        self.get_music_folders().await;
         self.get_all_songs(false).await;
         self.get_artists().await;
         self.get_playlists().await;

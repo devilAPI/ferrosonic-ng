@@ -30,6 +30,7 @@ Ferrosonic is fully keyboard-driven. Vim-style `j`/`k` navigation is available a
 | `Up` / `k` | Move selection up |
 | `Down` / `j` | Move selection down |
 | `Enter` | Play selected song (queues all visible songs and starts from selection) |
+| `m` | Cycle the active library / music folder (All, then each folder); shown in the pane title |
 
 The Songs page has two modes selectable from the options pane: **Starred** (your favourited songs) and **Random** (a random selection from the server).
 
@@ -47,6 +48,7 @@ The Songs page has two modes selectable from the options pane: **Starred** (your
 | `e` | Add selected item to end of queue |
 | `n` | Add selected item as next in queue |
 | `s` | Shuffle play all songs by the selected artist or album |
+| `m` | Cycle the active library / music folder (All, then each folder); shown in the pane title |
 
 ## Queue Page (F3)
 

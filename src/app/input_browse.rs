@@ -55,6 +55,13 @@ impl App {
                 state.browse.filter_active = true;
             }
 
+            // m: cycle the active library (music folder)
+            KeyCode::Char('m') => {
+                drop(state);
+                self.cycle_music_folder().await;
+                return Ok(());
+            }
+
             // Tab: cycle focus 0 ↔ 1 (same for both modes)
             KeyCode::Tab => {
                 state.browse.focus = if state.browse.focus == 0 { 1 } else { 0 };
@@ -554,7 +561,7 @@ impl App {
         }
     }
 
-    async fn load_song_option(&mut self, opt: SongOption) {
+    pub(super) async fn load_song_option(&mut self, opt: SongOption) {
         match opt {
             SongOption::All => {
                 {
@@ -569,7 +576,7 @@ impl App {
         }
     }
 
-    async fn load_album_option(&mut self, opt: SongOption) {
+    pub(super) async fn load_album_option(&mut self, opt: SongOption) {
         match opt {
             SongOption::All => {
                 {

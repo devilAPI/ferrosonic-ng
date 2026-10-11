@@ -119,6 +119,7 @@ pub fn draw(frame: &mut Frame, state: &AppState, mutations: &mut RenderMutations
     let footer = Footer::new(state.page, colors)
         .sample_rate(state.now_playing.sample_rate)
         .volume(state.volume)
+        .library_switch(state.has_multiple_music_folders())
         .notification(state.notification.as_ref());
     frame.render_widget(footer, footer_area);
 }

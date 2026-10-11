@@ -40,6 +40,11 @@ impl App {
             KeyCode::Char('/') => {
                 state.artists.filter_active = true;
             }
+            KeyCode::Char('m') => {
+                drop(state);
+                self.cycle_music_folder().await;
+                return Ok(());
+            }
             KeyCode::Esc => {
                 state.artists.filter.clear();
                 state.artists.expanded.clear();

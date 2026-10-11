@@ -190,6 +190,82 @@ impl App {
         }
     }
 
+    /// Fetch the server's music folders and scope the client to the configured one.
+    pub async fn get_music_folders(&mut self) {
+        let Some(client) = self.subsonic.as_mut() else {
+            return;
+        };
+
+        match client.get_music_folders().await {
+            Ok(folders) => {
+                let mut state = self.state.write().await;
+                info!("Loaded {} music folders", folders.len());
+                if state.set_music_folders(folders) {
+                    if let Err(e) = state.config.save_default() {
+                        warn!("Failed to save config: {}", e);
+                    }
+                }
+                client.set_music_folder(state.config.music_folder_id);
+            }
+            Err(e) => {
+                // Not every server implements getMusicFolders; browse everything.
+                warn!("Failed to load music folders: {}", e);
+                self.state.write().await.music_folders.clear();
+                client.set_music_folder(None);
+            }
+        }
+    }
+
+    /// Switch to the next library (All, then each music folder) and reload
+    /// everything that is scoped to it.
+    pub async fn cycle_music_folder(&mut self) {
+        let Some(client) = self.subsonic.as_mut() else {
+            return;
+        };
+
+        let (browse_tab, option) = {
+            let mut state = self.state.write().await;
+            if !state.has_multiple_music_folders() {
+                return;
+            }
+
+            let next = state.next_music_folder();
+            state.config.music_folder_id = next;
+            if let Err(e) = state.config.save_default() {
+                warn!("Failed to save config: {}", e);
+            }
+            client.set_music_folder(next);
+
+            // Everything cached for the previous library is stale now
+            state.artists.artists.clear();
+            state.artists.selected_index = None;
+            state.artists.expanded.clear();
+            state.artists.albums_cache.clear();
+            state.artists.songs.clear();
+            state.artists.selected_song = None;
+            state.artists.focus = 0;
+
+            let label = state.music_folder_name();
+            state.notify(format!("Library: {}", label));
+
+            (
+                state.browse.browse_tab,
+                state
+                    .browse
+                    .selected_option
+                    .clone()
+                    .unwrap_or(SongOption::All),
+            )
+        };
+
+        self.songs_filter_debounce = None;
+        match browse_tab {
+            BrowseTab::Songs => self.load_song_option(option).await,
+            BrowseTab::Albums => self.load_album_option(option).await,
+        }
+        self.get_artists().await;
+    }
+
     pub async fn get_artists(&mut self) {
         if let Some(ref client) = self.subsonic {
             match client.get_artists().await {
@@ -197,9 +273,7 @@ impl App {
                     let mut state = self.state.write().await;
                     let count = artists.len();
                     state.artists.artists = artists;
-                    if count > 0 {
-                        state.artists.selected_index = Some(0);
-                    }
+                    state.artists.selected_index = if count > 0 { Some(0) } else { None };
                     info!("Loaded {} artists", count);
                 }
                 Err(e) => {
