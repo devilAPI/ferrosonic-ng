@@ -55,11 +55,11 @@ impl App {
                 state.browse.filter_active = true;
             }
 
-            // m: cycle the active library (music folder)
+            // m: choose which libraries (music folders) to browse
             KeyCode::Char('m') => {
-                drop(state);
-                self.cycle_music_folder().await;
-                return Ok(());
+                if state.has_multiple_music_folders() {
+                    state.open_library_picker();
+                }
             }
 
             // Tab: cycle focus 0 ↔ 1 (same for both modes)

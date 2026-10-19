@@ -130,7 +130,10 @@ impl App {
                     if append {
                         state.browse.backing_albums.extend(albums);
                         if state.browse.backing_albums.len() > Self::MAX_BROWSE_ALBUMS {
-                            state.browse.backing_albums.truncate(Self::MAX_BROWSE_ALBUMS);
+                            state
+                                .browse
+                                .backing_albums
+                                .truncate(Self::MAX_BROWSE_ALBUMS);
                         }
                     } else {
                         state.browse.backing_albums = albums;
@@ -205,38 +208,37 @@ impl App {
                         warn!("Failed to save config: {}", e);
                     }
                 }
-                client.set_music_folder(state.config.music_folder_id);
+                client.set_music_folders(&state.config.music_folder_ids);
             }
             Err(e) => {
                 // Not every server implements getMusicFolders; browse everything.
                 warn!("Failed to load music folders: {}", e);
                 self.state.write().await.music_folders.clear();
-                client.set_music_folder(None);
+                client.set_music_folders(&[]);
             }
         }
     }
 
-    /// Switch to the next library (All, then each music folder) and reload
-    /// everything that is scoped to it.
-    pub async fn cycle_music_folder(&mut self) {
+    /// Browse the given libraries (empty means all) and reload everything
+    /// that is scoped to them.
+    pub async fn set_music_folder_selection(&mut self, ids: Vec<i64>) {
         let Some(client) = self.subsonic.as_mut() else {
             return;
         };
 
         let (browse_tab, option) = {
             let mut state = self.state.write().await;
-            if !state.has_multiple_music_folders() {
+            if state.config.music_folder_ids == ids {
                 return;
             }
 
-            let next = state.next_music_folder();
-            state.config.music_folder_id = next;
+            client.set_music_folders(&ids);
+            state.config.music_folder_ids = ids;
             if let Err(e) = state.config.save_default() {
                 warn!("Failed to save config: {}", e);
             }
-            client.set_music_folder(next);
 
-            // Everything cached for the previous library is stale now
+            // Everything cached for the previous libraries is stale now
             state.artists.artists.clear();
             state.artists.selected_index = None;
             state.artists.expanded.clear();

@@ -24,8 +24,8 @@ pub struct SubsonicClient {
     password: String,
     /// HTTP client
     http: Client,
-    /// Library to scope browse calls to; `None` means all libraries
-    music_folder_id: Option<i64>,
+    /// Libraries to scope browse calls to; empty means all libraries
+    music_folder_ids: Vec<i64>,
 }
 
 impl SubsonicClient {
@@ -43,21 +43,23 @@ impl SubsonicClient {
             username: username.to_string(),
             password: password.to_string(),
             http,
-            music_folder_id: None,
+            music_folder_ids: Vec::new(),
         })
     }
 
-    /// Scope subsequent browse calls to one library (music folder), or all when `None`
-    pub fn set_music_folder(&mut self, id: Option<i64>) {
-        self.music_folder_id = id;
+    /// Scope subsequent browse calls to the given libraries (music folders), or all when empty
+    pub fn set_music_folders(&mut self, ids: &[i64]) {
+        self.music_folder_ids = ids.to_vec();
     }
 
-    /// Build URL for a browse endpoint, adding `musicFolderId` when a library is selected
+    /// Build URL for a browse endpoint, adding one `musicFolderId` per selected library
     fn build_scoped_url(&self, endpoint: &str) -> Result<Url, SubsonicError> {
         let mut url = self.build_url(endpoint)?;
-        if let Some(id) = self.music_folder_id {
-            url.query_pairs_mut()
-                .append_pair("musicFolderId", &id.to_string());
+        {
+            let mut query = url.query_pairs_mut();
+            for id in &self.music_folder_ids {
+                query.append_pair("musicFolderId", &id.to_string());
+            }
         }
         Ok(url)
     }
@@ -203,7 +205,8 @@ impl SubsonicClient {
         random_songs_count: usize,
     ) -> Result<Vec<Child>, SubsonicError> {
         let mut url = self.build_scoped_url("getRandomSongs")?;
-        url.query_pairs_mut().append_pair("size", &random_songs_count.to_string());
+        url.query_pairs_mut()
+            .append_pair("size", &random_songs_count.to_string());
         let data: RandomSongsData = self.request_url(url).await?;
 
         let songs = data.random_songs.song;

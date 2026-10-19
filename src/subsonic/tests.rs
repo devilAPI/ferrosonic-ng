@@ -848,7 +848,7 @@ const EMPTY_STARRED: &str =
     r#"{"subsonic-response":{"status":"ok","version":"1.16.1","starred2":{}}}"#;
 
 #[tokio::test]
-async fn selected_music_folder_scopes_browse_calls() {
+async fn selected_music_folders_scope_browse_calls() {
     let server = MockServer::start_async().await;
     let mut mocks = Vec::new();
     for (endpoint, body) in [
@@ -863,7 +863,8 @@ async fn selected_music_folder_scopes_browse_calls() {
                 .mock_async(|when, then| {
                     when.method(GET)
                         .path(format!("/rest/{endpoint}"))
-                        .query_param("musicFolderId", "7");
+                        .query_param("musicFolderId", "7")
+                        .query_param("musicFolderId", "8");
                     then.status(200).body(body);
                 })
                 .await,
@@ -871,7 +872,7 @@ async fn selected_music_folder_scopes_browse_calls() {
     }
 
     let mut client = make_client(&server);
-    client.set_music_folder(Some(7));
+    client.set_music_folders(&[7, 8]);
 
     client.get_artists().await.unwrap();
     client.get_album_list("newest", 10, 0).await.unwrap();
@@ -911,8 +912,8 @@ async fn no_music_folder_leaves_browse_calls_unscoped() {
 
     let mut client = make_client(&server);
     // Selecting a folder and going back to "All" must drop the parameter again.
-    client.set_music_folder(Some(7));
-    client.set_music_folder(None);
+    client.set_music_folders(&[7]);
+    client.set_music_folders(&[]);
 
     client.get_artists().await.unwrap();
     client.get_album_list("newest", 10, 0).await.unwrap();
@@ -936,6 +937,6 @@ async fn get_artists_treats_data_not_found_as_empty() {
         .await;
 
     let mut client = make_client(&server);
-    client.set_music_folder(Some(2));
+    client.set_music_folders(&[2]);
     assert!(client.get_artists().await.unwrap().is_empty());
 }

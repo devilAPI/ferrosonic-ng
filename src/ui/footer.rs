@@ -76,7 +76,7 @@ impl<'a> Footer<'a> {
                     ("f", "Star/Un-star"),
                 ]);
                 if self.library_switch {
-                    binds.push(("m", "Library"));
+                    binds.push(("m", "Libraries"));
                 }
             }
             Page::Artists => {
@@ -90,7 +90,7 @@ impl<'a> Footer<'a> {
                     ("f", "Star/Un-star"),
                 ]);
                 if self.library_switch {
-                    binds.push(("m", "Library"));
+                    binds.push(("m", "Libraries"));
                 }
             }
             Page::Queue => {
